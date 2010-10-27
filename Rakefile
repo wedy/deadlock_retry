@@ -20,6 +20,7 @@ begin
     s.authors = ["Jamis Buck", "Mike Perham", "Denis Sukhonin"]
     s.files =  FileList['README', 'Rakefile', 'version.yml', "{lib,test}/**/*", 'CHANGELOG']
   end
+  Jeweler::GemcutterTasks.new
 rescue LoadError
   # Jeweler, or one of its dependencies, is not available. Install it with: sudo gem install technicalpickles-jeweler -s http://gems.github.com
 end

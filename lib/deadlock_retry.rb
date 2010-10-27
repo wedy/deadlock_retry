@@ -19,6 +19,8 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 module DeadlockRetry
+  mattr_accessor :maximum_retries_on_deadlock
+  self.maximum_retries_on_deadlock = MAXIMUM_RETRIES_ON_DEADLOCK || 3
 
   def self.included(base)
     base.extend(ClassMethods)
@@ -35,8 +37,6 @@ module DeadlockRetry
       "Lock wait timeout exceeded"
     ]
 
-    MAXIMUM_RETRIES_ON_DEADLOCK = 3
-
     def transaction_with_deadlock_handling(*objects, &block)
       retry_count = 0
 
@@ -45,10 +45,10 @@ module DeadlockRetry
       rescue ActiveRecord::StatementInvalid => error
         raise if in_nested_transaction?
         if DEADLOCK_ERROR_MESSAGES.any? { |msg| error.message =~ /#{Regexp.escape(msg)}/ }
-          raise if retry_count >= MAXIMUM_RETRIES_ON_DEADLOCK
-          retry_count += 1
           logger.info "Deadlock detected on retry #{retry_count}, restarting transaction"
           log_innodb_status
+          raise if retry_count >= DeadlockRetry.maximum_retries_on_deadlock
+          retry_count += 1
           retry
         else
           raise

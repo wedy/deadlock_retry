@@ -1,8 +1,7 @@
 require 'rubygems'
 
-# Change the version if you want to test a different version of ActiveRecord
-gem 'activerecord', '2.2.2'
 require 'active_record'
+require 'active_record/base'
 require 'active_record/version'
 puts "Testing ActiveRecord #{ActiveRecord::VERSION::STRING}"
 

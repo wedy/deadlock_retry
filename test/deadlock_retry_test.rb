@@ -27,7 +27,7 @@ class MockModel
   end
 
   def self.logger
-    @logger ||= Logger.new(nil)
+    # nothing to do here
   end
 
   include DeadlockRetry

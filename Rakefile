@@ -13,11 +13,11 @@ begin
   require 'jeweler'
 
   Jeweler::Tasks.new do |s|
-    s.name = "negval-deadlock_retry"
-    s.email = "d.sukhonin@gmail.com"
-    s.homepage = "http://github.com/neglectedvalue/deadlock_retry"
+    s.name = "deadlock_retry"
+    s.email = "kieran@heaps.co.nz"
+    s.homepage = "http://github.com/heaps/deadlock_retry"
     s.description = s.summary = "Provides automatical deadlock retry and logging functionality for ActiveRecord and MySQL"
-    s.authors = ["Jamis Buck", "Mike Perham", "Denis Sukhonin"]
+    s.authors = ["Jamis Buck", "Mike Perham", "Denis Sukhonin", "Kieran Pilkington"]
     s.files =  FileList['README', 'Rakefile', 'version.yml', "{lib,test}/**/*", 'CHANGELOG']
   end
   Jeweler::GemcutterTasks.new

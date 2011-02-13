@@ -1,5 +1,11 @@
 deadlock_retry changes
 
+== v1.0.2 (2011-02-14)
+
+* Get working with Rails 2.3.5 or higher
+* Get test suite passing again
+* Code cleanup
+
 == v1.0 - (2009-02-07)
 
 * Add INNODB status logging for debugging deadlock issues.

@@ -26,7 +26,7 @@ module DeadlockRetry
 
   # Implement how to log the messages from this module. It helps debugging.
   mattr_accessor :deadlock_logger
-  self.deadlock_logger = false # implement your own via a proc
+  self.deadlock_logger = proc { |msg| } # override as needed
 
   DEADLOCK_ERROR_MESSAGES = [
     "Deadlock found when trying to get lock",
@@ -84,7 +84,7 @@ module DeadlockRetry
   end
 
   def deadlock_log(msg)
-    DeadlockRetry.deadlock_logger.call(msg) if DeadlockRetry.deadlock_logger
+    DeadlockRetry.deadlock_logger.call(msg)
   end
 
 end

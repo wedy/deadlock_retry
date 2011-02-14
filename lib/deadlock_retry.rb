@@ -26,60 +26,67 @@ module DeadlockRetry
 
   # Implement how to log the messages from this module. It helps debugging.
   mattr_accessor :deadlock_logger
-  self.deadlock_logger = proc { |msg, klass| klass.logger.warn(msg) if klass.logger }
+  self.deadlock_logger = false # implement your own via a proc
 
-  def self.included(base)
-    base.extend(ClassMethods)
-    base.class_eval do
-      class << self
-        alias_method_chain :transaction, :deadlock_handling
-      end
+  DEADLOCK_ERROR_MESSAGES = [
+    "Deadlock found when trying to get lock",
+    "Lock wait timeout exceeded"
+  ]
+
+  def self.included(klass)
+    klass.class_eval do
+      alias_method_chain :execute, :deadlock_handling
     end
   end
 
-  module ClassMethods
-    DEADLOCK_ERROR_MESSAGES = [
-      "Deadlock found when trying to get lock",
-      "Lock wait timeout exceeded"
-    ]
+  def execute_with_deadlock_handling(*objects, &block)
+    retry_count = 0
 
-    def transaction_with_deadlock_handling(*objects, &block)
-      retry_count = 0
+    begin
+      execute_without_deadlock_handling(*objects, &block)
+    rescue ActiveRecord::StatementInvalid => error
+      raise unless DEADLOCK_ERROR_MESSAGES.any? { |msg| error.message =~ /#{Regexp.escape(msg)}/i }
 
-      begin
-        transaction_without_deadlock_handling(*objects, &block)
-      rescue ActiveRecord::StatementInvalid => error
-        raise if in_nested_transaction?
-        raise unless DEADLOCK_ERROR_MESSAGES.any? { |msg| error.message =~ /#{Regexp.escape(msg)}/i }
-
-        DeadlockRetry.deadlock_logger.call("Deadlock detected on retry #{retry_count}, restarting transaction", self)
-        log_innodb_status
-        raise if retry_count >= DeadlockRetry.maximum_retries_on_deadlock
-
-        retry_count += 1
-        retry
+      if in_nested_transaction?
+        deadlock_log "Deadlock detected as part of a nested transaction, unable to recover"
+        raise
       end
+
+      if retry_count >= DeadlockRetry.maximum_retries_on_deadlock
+        deadlock_log "Deadlock unavoidable (locked #{retry_count} times), please investigate"
+        log_innodb_status
+        raise
+      end
+
+      deadlock_log "Deadlock detected on retry #{retry_count}, restarting transaction"
+      retry_count += 1
+      retry
     end
+  end
 
-    private
+  private
 
-    def in_nested_transaction?
-      # open_transactions was added in 2.2's connection pooling changes.
-      connection.respond_to?(:open_transactions) && connection.open_transactions > 0
-    end
+  def in_nested_transaction?
+    # open_transactions was added in 2.2's connection pooling changes.
+    self.respond_to?(:open_transactions) && self.open_transactions > 0
+  end
 
-    def log_innodb_status
-      # `show innodb status` is the only way to get visiblity into why the transaction deadlocked
-      lines = connection.select_value("show innodb status")
-      DeadlockRetry.deadlock_logger.call("INNODB Status follows:", self)
-      lines.each_line { |line| DeadlockRetry.deadlock_logger.call(line, self) }
-    rescue Exception => e
-      # If it fails, it's not the end of the world. Let's just ignore it.
-      DeadlockRetry.deadlock_logger.call("Failed to log innodb status: #{e.message}", self)
-    end
+  def log_innodb_status
+    # `show innodb status` is the only way to get visiblity into why the transaction deadlocked
+    deadlock_log "INNODB Status follows:"
+    self.select_values("show innodb status").each { |line|
+      deadlock_log(line)
+    }
+  rescue Exception => e
+    # If it fails (because user hasn't got the privilege to do it),
+    # it's not the end of the world. Let's just ignore it.
+    deadlock_log "Failed to log innodb status: #{e.message}"
+  end
 
+  def deadlock_log(msg)
+    DeadlockRetry.deadlock_logger.call(msg) if DeadlockRetry.deadlock_logger
   end
 
 end
 
-ActiveRecord::Base.send(:include, DeadlockRetry)
+ActiveRecord::ConnectionAdapters::MysqlAdapter.send(:include, DeadlockRetry)
